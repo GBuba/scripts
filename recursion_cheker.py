@@ -27,7 +27,7 @@ JIRA_SERVER = "https://jira.osmp.ru"
 jira = JIRA(server=JIRA_SERVER, basic_auth=('username', 'password'))
 
 # Создаем JQL запрос (https://jira.osmp.ru/issues/?filter=78402)
-JQL = "project = SS AND resolution = Duplicate AND comment ~ '*SS-*' AND status changed to CLOSED during (-24h, now())  ORDER BY updated DESC"
+JQL = "project = OPS AND resolution = Duplicate AND comment ~ '*OPS-*' AND status changed to CLOSED during (-24h, now())  ORDER BY updated DESC"
 
 # Ищем тикеты по нашему запросу JQL
 issues = jira.search_issues(JQL)
