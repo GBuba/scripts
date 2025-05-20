@@ -55,7 +55,7 @@ spec:
                   topologyKey: kubernetes.io/hostname
           containers:
           - name: elk-auto-index-py
-            image: artifactory.com/elk-auto-index-py:prod1.0
+            image: artifactory.com/elk-auto-index-py:1.0
             imagePullPolicy: IfNotPresent
             env:
             - name: ELK_PASSWORD
