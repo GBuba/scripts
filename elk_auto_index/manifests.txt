@@ -18,7 +18,7 @@ metadata:
   name: elk-config
   namespace: your-namespace  # Укажите здесь то же пространство имен
 data:
-  common_name: voicebot, audit
+  common_name: test, audit
 
 
 CronJob.yaml
@@ -55,7 +55,7 @@ spec:
                   topologyKey: kubernetes.io/hostname
           containers:
           - name: elk-auto-index-py
-            image: alfamessaging-docker-releases.binary.alfabank.ru/elk-auto-index-py:prod1.0
+            image: artifactory.com/elk-auto-index-py:prod1.0
             imagePullPolicy: IfNotPresent
             env:
             - name: ELK_PASSWORD
@@ -68,7 +68,7 @@ spec:
               mountPath: "/etc/config"
               readOnly: true
           nodeSelector:
-            kubernetes.io/hostname: amsg-infra-3.moscow.alfaintra.net
+            kubernetes.io/hostname: moscow-3.net
           tolerations:
           - effect: NoSchedule
             key: app
