@@ -1,0 +1,84 @@
+secret.yaml
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: elk-secret
+  namespace: your-namespace  # Укажите здесь нужное пространство имен
+type: Opaque
+data:
+  password: cGFzc3dvcmQ=  # Здесь используется base64-кодированное значение вашего пароля
+
+
+configmap.yaml
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: elk-config
+  namespace: your-namespace  # Укажите здесь то же пространство имен
+data:
+  common_name: voicebot, audit
+
+
+CronJob.yaml
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: elk-auto-index-py
+  namespace: kibana
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: elk-auto-index-py
+  namespace: kibana
+spec:
+  schedule: "0 0 * * *"  # Запуск каждый день в полночь
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: elk-auto-index-py
+          annotations:
+            prometheus.io/scrape: "false"  # 🛑 Отключаем сбор метрик для Prometheus
+        spec:
+          affinity:
+            podAntiAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 1
+                podAffinityTerm:
+                  labelSelector:
+                    matchLabels:
+                      app: elk-auto-index-py
+                  topologyKey: kubernetes.io/hostname
+          containers:
+          - name: elk-auto-index-py
+            image: alfamessaging-docker-releases.binary.alfabank.ru/elk-auto-index-py:prod1.0
+            imagePullPolicy: IfNotPresent
+            env:
+            - name: ELK_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: elk-secret
+                  key: password
+            volumeMounts:
+            - name: config-volume
+              mountPath: "/etc/config"
+              readOnly: true
+          nodeSelector:
+            kubernetes.io/hostname: amsg-infra-3.moscow.alfaintra.net
+          tolerations:
+          - effect: NoSchedule
+            key: app
+            operator: Equal
+            value: infra
+          restartPolicy: Never
+          volumes:
+          - name: config-volume
+            configMap:
+              name: elk-config
+  successfulJobsHistoryLimit: 1  # Не сохранять, если pod успешный
+  failedJobsHistoryLimit: 1      # Сохранять последний неуспешный pod
+  
