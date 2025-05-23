@@ -1,0 +1,68 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ .Values.cronjob.name }}
+  namespace: {{ .Values.namespace }}
+spec:
+  schedule: {{ .Values.cronjob.schedule }}
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: {{ .Values.cronjob.name }}
+          annotations:
+            prometheus.io/scrape: "false"
+        spec:
+          affinity:
+            podAntiAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 1
+                podAffinityTerm:
+                  labelSelector:
+                    matchLabels:
+                      app: {{ .Values.cronjob.name }}
+                  topologyKey: kubernetes.io/hostname
+          containers:
+          - name: {{ .Values.cronjob.name }}
+            image: "{{ .Values.cronjob.image.repository }}:{{ .Values.cronjob.image.tag }}"
+            imagePullPolicy: {{ .Values.cronjob.image.pullPolicy }}
+            env:
+            - name: ES_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Values.configmap.name }}
+                  key: es_host
+            - name: KIBANA_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Values.configmap.name }}
+                  key: kibana_host
+            - name: USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Values.configmap.name }}
+                  key: username
+            - name: ELK_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secret.name }}
+                  key: password
+            volumeMounts:
+            - name: config-volume
+              mountPath: "/etc/config"
+              readOnly: true
+          nodeSelector:
+            kubernetes.io/hostname: {{ index .Values.cronjob.nodeSelector "kubernetes.io/hostname" }}
+          tolerations:
+          - effect: NoSchedule
+            key: app
+            operator: Equal
+            value: {{ .Values.cronjob.tolerations.value }}
+          restartPolicy: Never
+          volumes:
+          - name: config-volume
+            configMap:
+              name: {{ .Values.configmap.name }}
+  successfulJobsHistoryLimit: 0
+  failedJobsHistoryLimit: 1

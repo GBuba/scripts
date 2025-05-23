@@ -18,16 +18,11 @@ metadata:
   name: elk-config
   namespace: your-namespace  # Укажите здесь то же пространство имен
 data:
-  common_name: test, audit
+  common_name: app1, app2
 
 
 CronJob.yaml
 
-apiVersion: batch/v1
-kind: CronJob
-metadata:
-  name: elk-auto-index-py
-  namespace: kibana
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -55,7 +50,7 @@ spec:
                   topologyKey: kubernetes.io/hostname
           containers:
           - name: elk-auto-index-py
-            image: artifactory.com/elk-auto-index-py:1.0
+            image: docker-releases.binary.ru/elk-auto-index-py:prod1.0
             imagePullPolicy: IfNotPresent
             env:
             - name: ELK_PASSWORD
@@ -73,12 +68,12 @@ spec:
           - effect: NoSchedule
             key: app
             operator: Equal
-            value: infra
+            value: moscow
           restartPolicy: Never
           volumes:
           - name: config-volume
             configMap:
               name: elk-config
-  successfulJobsHistoryLimit: 1  # Не сохранять, если pod успешный
+  successfulJobsHistoryLimit: 0  # Не сохранять, если pod успешный
   failedJobsHistoryLimit: 1      # Сохранять последний неуспешный pod
   

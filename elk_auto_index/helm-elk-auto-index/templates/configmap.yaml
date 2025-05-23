@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.configmap.name }}
+  namespace: {{ .Values.namespace }}
+data:
+  common_name: {{ .Values.configmap.data.common_name }}
+  es_host: {{ .Values.configmap.data.es_host }}
+  kibana_host: {{ .Values.configmap.data.kibana_host }}
+  username: {{ .Values.configmap.data.username }}

@@ -1,0 +1,25 @@
+namespace: kibana
+
+secret:
+  name: elk-secret
+  password: password  # Ваш пароль, будет закодирован в Base64
+
+configmap:
+  name: elk-config
+  data:
+    common_name: "app1, app2"
+    es_host: "http://localhost:9200"  # Хост Elasticsearch 
+    kibana_host: "http://localhost:5601"  # Хост Kibana 
+    username: "elastic"  # Имя пользователя
+
+cronjob:
+  name: elk-auto-index-py
+  schedule: "0 0 * * *"
+  image:
+    repository: docker-releases.binary.ru/elk-auto-index-py
+    tag: v1.0 # Текущая версия скрипта
+    pullPolicy: Always
+  nodeSelector:
+    kubernetes.io/hostname: moscow-3.net # Нода с которой есть доступы к es и kibana
+  tolerations:
+    value: moscow 
