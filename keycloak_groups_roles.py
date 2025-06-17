@@ -1,0 +1,187 @@
+### Скрипт создает в реалме NEW_REALM группы из GROUPS_TO_CREATE и кладет в них подгруппы SUBGROUPS + к каждой подгруппе привязывает роль вида {subgroup}-{role_suffix} ###
+### Не забыть изменить "client_secret" ###
+
+import requests
+import json
+import urllib3
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# Keycloak
+KEYCLOAK_URL = "https://localhost:8080"
+MASTER_REALM = "master"         # Реалм администратора
+ADMIN_USER = "admin"
+ADMIN_PASSWORD = "admin"
+
+# Новый реалм
+NEW_REALM = "test-realm"
+
+# Группы и подгруппы
+GROUPS_TO_CREATE = ["kibana", "grafana", "k8s"]
+SUBGROUPS = ["test", "prod", "nt", "stage"]
+
+# Префикс ролей (роль будет {subgroup}-{role_suffix})
+ROLE_SUFFIX = "viewer"
+
+# Получение токена администратора
+def get_admin_token():
+    token_url = f"{KEYCLOAK_URL}/realms/{MASTER_REALM}/protocol/openid-connect/token"
+    data = {
+        "username": ADMIN_USER,
+        "password": ADMIN_PASSWORD,
+        "grant_type": "password",
+        "client_id": "admin-cli",
+        "client_secret": "your_client_secret_here" # <- Заменить на сектрет от admin-cli
+    }
+    response = requests.post(token_url, data=data, verify=False)
+    response.raise_for_status()
+    return response.json()["access_token"]
+
+
+# Создание нового реалма
+def create_realm(token):
+    url = f"{KEYCLOAK_URL}/admin/realms/{NEW_REALM}"
+    headers = {
+        "Authorization": f"Bearer {token}"
+    }
+
+    # Проверяем, существует ли реалм
+    response = requests.get(url, headers=headers, verify=False)
+
+    if response.status_code == 200:
+        print(f"Реалм '{NEW_REALM}' уже существует.")
+        return
+    elif response.status_code != 404:
+        # Если ошибка не "не найден", выбрасываем исключение
+        response.raise_for_status()
+
+    # Реалм не найден — создаём его
+    url_create = f"{KEYCLOAK_URL}/admin/realms"
+    payload = {
+        "realm": NEW_REALM,
+        "enabled": True
+    }
+    create_response = requests.post(url_create, headers={**headers, "Content-Type": "application/json"},
+                                    json=payload, verify=False)
+    create_response.raise_for_status()
+    print(f"Реалм '{NEW_REALM}' успешно создан.")
+
+
+# Получение ID реалма по имени
+def get_realm_id(token, realm_name):
+    url = f"{KEYCLOAK_URL}/admin/realms"
+    headers = {
+        "Authorization": f"Bearer {token}"
+    }
+    response = requests.get(url, headers=headers, verify=False)
+    response.raise_for_status()
+    realms = response.json()
+    for r in realms:
+        if r["realm"] == realm_name:
+            return r["id"]
+    raise Exception(f"Realm {realm_name} не найден")
+
+
+# Создание группы
+def create_group(token, realm, parent_group_id, group_name, parent_path=""):
+    url = f"{KEYCLOAK_URL}/admin/realms/{realm}/groups"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+
+    if parent_group_id:
+        url += f"/{parent_group_id}/children"
+
+    payload = {
+        "name": group_name
+    }
+
+    response = requests.post(url, headers=headers, data=json.dumps(payload), verify=False)
+    if response.status_code == 409:
+        print(f"Группа '{group_name}' уже существует в '{parent_path}'.")
+        # Получаем существующую группу, чтобы получить её ID
+        groups = get_groups(token, realm, parent_group_id)
+        for g in groups:
+            if g["name"] == group_name:
+                return g["id"]
+    else:
+        response.raise_for_status()
+        print(f"Создана группа '{group_name}' в '{parent_path}'.")
+    
+    location = response.headers.get("Location")
+    group_id = location.split("/")[-1]
+    return group_id
+
+
+# Получение списка групп
+def get_groups(token, realm, parent_group_id=None):
+    url = f"{KEYCLOAK_URL}/admin/realms/{realm}/groups"
+    if parent_group_id:
+        url += f"/{parent_group_id}/children"
+    headers = {
+        "Authorization": f"Bearer {token}"
+    }
+    response = requests.get(url, headers=headers, verify=False)
+    response.raise_for_status()
+    return response.json()
+
+
+# Создание роли
+def create_role(token, realm, role_name):
+    url = f"{KEYCLOAK_URL}/admin/realms/{realm}/roles"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "name": role_name
+    }
+    response = requests.post(url, headers=headers, data=json.dumps(payload), verify=False)
+    if response.status_code == 409:
+        print(f"Роль '{role_name}' уже существует.")
+    else:
+        response.raise_for_status()
+        print(f"Создана роль '{role_name}'.")
+
+
+# Назначение роли на группу
+def assign_role_to_group(token, realm, group_id, role_name):
+    url = f"{KEYCLOAK_URL}/admin/realms/{realm}/groups/{group_id}/role-mappings/realm"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+
+    # Получаем ID роли
+    roles_url = f"{KEYCLOAK_URL}/admin/realms/{realm}/roles"
+    response = requests.get(roles_url, headers=headers, verify=False)
+    response.raise_for_status()
+    roles = response.json()
+    role = next((r for r in roles if r["name"] == role_name), None)
+    if not role:
+        raise Exception(f"Роль '{role_name}' не найдена")
+
+    payload = [{"id": role["id"], "name": role["name"]}]
+
+    response = requests.post(url, headers=headers, data=json.dumps(payload), verify=False)
+    response.raise_for_status()
+    print(f"Роль '{role_name}' назначена на группу.")
+
+def main():
+    token = get_admin_token()
+
+    create_realm(token)
+
+    # Создаем группы и подгруппы
+    for group_name in GROUPS_TO_CREATE:
+        group_id = create_group(token, NEW_REALM, None, group_name)
+        for subgroup in SUBGROUPS:
+            subgroup_id = create_group(token, NEW_REALM, group_id, subgroup, parent_path=group_name)
+            role_name = f"{subgroup}-{ROLE_SUFFIX}"
+            create_role(token, NEW_REALM, role_name)
+            # Назначаем роль на подгруппу
+            assign_role_to_group(token, NEW_REALM, subgroup_id, role_name)
+
+if __name__ == "__main__":
+    main()
