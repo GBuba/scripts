@@ -17,7 +17,6 @@ ES_URL = "https://localhost:9200"
 ES_USER = "elastic"
 ES_PASSWORD = "elastic_password"
 
-ROLE_NAME = "test-viewer"
 TARGET_GROUP_PATH = "/kibana/test"
 
 # Получение токена администратора Keycloak
