@@ -17,8 +17,6 @@ ES_URL = "https://localhost:9200"
 ES_USER = "elastic"
 ES_PASSWORD = "elastic_password"
 
-TARGET_GROUP_PATH = "/kibana/test"
-
 # Получение токена администратора Keycloak
 def get_kc_admin_token():
     url = f"{KEYCLOAK_URL}/realms/master/protocol/openid-connect/token"
