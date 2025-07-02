@@ -9,7 +9,7 @@
     git clone 
     cd elk_kk_index_group_role
     vi values.yaml (вносим нужные изменения)
-    helm install elk-kk-index-group-role . / helm upgrade elk-kk-index-group-role .
+    helm -n kibana install elk-kk-index-group-role . / helm -n kibana upgrade elk-kk-index-group-role .
     
     Запускать:
     kubectl create job --from=cronjob/elk-auto-index-py elk-auto-index-py-manual -n kibana && \
