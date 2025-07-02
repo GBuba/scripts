@@ -1,0 +1,93 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ .Values.cronjobs.keycloakEsRolemapping.name }}
+  namespace: {{ .Values.namespace }}
+spec:
+  schedule: "{{ .Values.cronjobs.keycloakEsRolemapping.schedule }}"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: {{ .Values.cronjobs.keycloakEsRolemapping.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.cronjobs.keycloakEsRolemapping.failedJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: {{ quote .Values.cronjobs.keycloakEsRolemapping.name }}
+          annotations:
+            prometheus.io/scrape: "false"
+        spec:
+          affinity:
+            podAntiAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+                - weight: 1
+                  podAffinityTerm:
+                    labelSelector:
+                      matchLabels:
+                        app: {{ quote .Values.cronjobs.keycloakEsRolemapping.name }}
+                    topologyKey: kubernetes.io/hostname
+          containers:
+            - name: keycloak-es-rolemapping
+              image: "{{ .Values.cronjobs.keycloakEsRolemapping.image.repository }}:{{ .Values.cronjobs.keycloakEsRolemapping.image.tag }}"
+              imagePullPolicy: "{{ .Values.cronjobs.keycloakEsRolemapping.image.pullPolicy }}"
+              env:
+                - name: KEYCLOAK_URL
+                  valueFrom:
+                    configMapKeyRef:
+                      name: {{ .Values.configmap.name }}
+                      key: KEYCLOAK_URL
+                - name: REALM
+                  valueFrom:
+                    configMapKeyRef:
+                      name: {{ .Values.configmap.name }}
+                      key: NEW_REALM
+                - name: CLIENT_ID
+                  valueFrom:
+                    configMapKeyRef:
+                      name: {{ .Values.configmap.name }}
+                      key: CLIENT_ID
+                - name: ADMIN_USER
+                  valueFrom:
+                    configMapKeyRef:
+                      name: {{ .Values.configmap.name }}
+                      key: ADMIN_USER
+                - name: ADMIN_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.secret.name }}
+                      key: adminPassword
+                - name: ES_URL
+                  valueFrom:
+                    configMapKeyRef:
+                      name: {{ .Values.configmap.name }}
+                      key: ES_HOST
+                - name: ES_USER
+                  valueFrom:
+                    configMapKeyRef:
+                      name: {{ .Values.configmap.name }}
+                      key: ES_USER
+                - name: ES_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.secret.name }}
+                      key: esPassword
+                - name: TARGET_GROUP_PATH
+                  valueFrom:
+                    configMapKeyRef:
+                      name: {{ .Values.configmap.name }}
+                      key: TARGET_GROUP_PATH
+                - name: CLIENT_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.secret.name }}
+                      key: clientSecret
+          nodeSelector:
+            kubernetes.io/hostname: {{ index .Values.cronjobs.keycloakEsRolemapping.nodeSelector "kubernetes.io/hostname" }}
+          tolerations:
+            - effect: NoSchedule
+              key: app
+              operator: Equal
+              value: {{ .Values.cronjobs.keycloakEsRolemapping.tolerations.value }}
+          restartPolicy: Never
+  successfulJobsHistoryLimit: {{ .Values.cronjobs.keycloakEsRolemapping.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.cronjobs.keycloakEsRolemapping.failedJobsHistoryLimit }}
