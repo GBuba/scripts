@@ -1,0 +1,83 @@
+namespace: kibana
+
+# --- CronJobs ---
+cronjobs:
+  keycloakGroupsRoles:
+    enabled: true
+    name: keycloak-groups-roles
+    schedule: "0 0 31 2 *"  # не будет запускаться сам
+    successfulJobsHistoryLimit: 0
+    failedJobsHistoryLimit: 1
+    image:
+      repository: docker-releases.binary.moscow.net/keycloak_groups_roles
+      tag: v0.1
+      pullPolicy: IfNotPresent
+    nodeSelector:
+      kubernetes.io/hostname: moscow.net
+    tolerations:
+      value: moscow
+
+  keycloakEsRolemapping:
+    enabled: true
+    name: keycloak-es-rolemapping
+    schedule: "0 0 31 2 *"
+    successfulJobsHistoryLimit: 0
+    failedJobsHistoryLimit: 1
+    image:
+      repository: docker-releases.binary.moscow.net/keycloak_elastic_rolemappings
+      tag: v0.1
+      pullPolicy: IfNotPresent
+    nodeSelector:
+      kubernetes.io/hostname: moscow.net
+    tolerations:
+      value: moscow
+
+  elkAutoIndex:
+    enabled: true
+    name: elk-auto-index-py
+    schedule: "0 0 31 2 *"
+    successfulJobsHistoryLimit: 0
+    failedJobsHistoryLimit: 1
+    image:
+      repository: docker-releases.binary.moscow.net/elk-auto-index-py
+      tag: v1.0
+      pullPolicy: Always
+    nodeSelector:
+      kubernetes.io/hostname: moscow.net
+    tolerations:
+      value: moscow
+
+# --- ConfigMap ---
+configmap:
+  name: unified-config
+
+# --- Secret ---
+secret:
+  name: unified-secrets
+
+# --- Elasticsearch ---
+elasticsearch:
+  host: "https://opensrch-3:9200" 
+  kibanaHost: "https://moscow.net/kibana" 
+  user: elastic
+  password: "pa$$w0rd" # Заменить
+  common_name: "testapp1, testapp2" # Указать новое название(если несколько - через запятую)
+
+# --- Keycloak ---
+keycloak:
+  url: "https://moscow.net/keycloak"
+  masterRealm: "master"
+  newRealm: "test-realm" # realm в котором все будет создаваться
+  adminUser: "admin"
+  adminPassword: "pa$$w0rd" # Заменить
+  clientId: "admin-cli"
+  clientSecret: "admin-cli-clientSecret" # Заменить
+  groups:
+    - kibana
+    - grafana
+  subgroups:
+    - testapp1 # тоже самое что и в common_name
+    - testapp2
+  roleSuffix: viewer
+
+targetGroupPath: "/kibana" # Группа из которой берутся роли
