@@ -1,21 +1,22 @@
 import requests
 import json
 import urllib3
+import os
 
 urllib3.disable_warnings()
 
-# Keycloak
-KEYCLOAK_URL = "https://keycloak.example.com"
-ADMIN_USER = "admin"
-ADMIN_PASSWORD = "admin"
-REALM = "test-realm"
-CLIENT_ID = "admin-cli"
-CLIENT_SECRET = "your_client_secret_here"
+KEYCLOAK_URL = os.getenv("KEYCLOAK_URL")
+REALM = os.getenv("REALM")
+CLIENT_ID = os.getenv("CLIENT_ID")
+ADMIN_USER = os.getenv("ADMIN_USER")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
+CLIENT_SECRET = os.getenv("CLIENT_SECRET")
 
-# ES
-ES_URL = "https://localhost:9200" 
-ES_USER = "elastic"
-ES_PASSWORD = "elastic_password"
+ES_URL = os.getenv("ES_URL")
+ES_USER = os.getenv("ES_USER")
+ES_PASSWORD = os.getenv("ES_PASSWORD")
+
+TARGET_GROUP_PATH = os.getenv("TARGET_GROUP_PATH")
 
 # Получение токена администратора Keycloak
 def get_kc_admin_token():
@@ -138,7 +139,7 @@ def main():
         print(f" - {path}")
 
     # Фильтруем только те, что начинаются с /kibana/
-    filtered_groups = [path for path in all_group_paths if path.startswith("/kibana/")]
+    filtered_groups = [path for path in all_group_paths if path.startswith(TARGET_GROUP_PATH)]
 
     for group_path in filtered_groups:
         create_role_mapping(group_path)
