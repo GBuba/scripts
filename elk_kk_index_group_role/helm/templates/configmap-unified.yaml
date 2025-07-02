@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.configmap.name }}
+  namespace: {{ .Values.namespace }}
+data:
+  KEYCLOAK_URL: "{{ .Values.keycloak.url }}"
+  MASTER_REALM: "{{ .Values.keycloak.masterRealm }}"
+  NEW_REALM: "{{ .Values.keycloak.newRealm }}"
+  CLIENT_ID: "{{ .Values.keycloak.clientId }}"
+  ADMIN_USER: "{{ .Values.keycloak.adminUser }}"
+  GROUPS_TO_CREATE: {{ join " " .Values.keycloak.groups | quote }}
+  SUBGROUPS: {{ join " " .Values.keycloak.subgroups | quote }}
+  ROLE_SUFFIX: "{{ .Values.keycloak.roleSuffix }}"
+  
+  TARGET_GROUP_PATH: "{{ .Values.targetGroupPath }}"
+
+  ES_HOST: "{{ .Values.elasticsearch.host }}"
+  KIBANA_HOST: "{{ .Values.elasticsearch.kibanaHost }}"
+  ES_USER: "{{ .Values.elasticsearch.user }}"
+  common_name: "{{ .Values.elasticsearch.common_name }}"
