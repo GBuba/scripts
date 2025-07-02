@@ -1,0 +1,68 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ .Values.cronjobs.elkAutoIndex.name }}
+  namespace: {{ .Values.namespace }}
+spec:
+  schedule: "{{ .Values.cronjobs.elkAutoIndex.schedule }}"
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: {{ quote .Values.cronjobs.elkAutoIndex.name }}
+          annotations:
+            prometheus.io/scrape: "false"
+        spec:
+          affinity:
+            podAntiAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+                - weight: 1
+                  podAffinityTerm:
+                    labelSelector:
+                      matchLabels:
+                        app: {{ quote .Values.cronjobs.elkAutoIndex.name }}
+                    topologyKey: kubernetes.io/hostname
+          containers:
+            - name: {{ .Values.cronjobs.elkAutoIndex.name }}
+              image: "{{ .Values.cronjobs.elkAutoIndex.image.repository }}:{{ .Values.cronjobs.elkAutoIndex.image.tag }}"
+              imagePullPolicy: "{{ .Values.cronjobs.elkAutoIndex.image.pullPolicy }}"
+              env:
+                - name: ES_HOST
+                  valueFrom:
+                    configMapKeyRef:
+                      name: {{ .Values.configmap.name }}
+                      key: ES_HOST
+                - name: KIBANA_HOST
+                  valueFrom:
+                    configMapKeyRef:
+                      name: {{ .Values.configmap.name }}
+                      key: KIBANA_HOST
+                - name: USERNAME
+                  valueFrom:
+                    configMapKeyRef:
+                      name: {{ .Values.configmap.name }}
+                      key: ES_USER
+                - name: ELK_PASSWORD  
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.secret.name }}
+                      key: esPassword
+              volumeMounts:
+                - name: config-volume
+                  mountPath: "/etc/config"
+                  readOnly: true
+          volumes:
+            - name: config-volume
+              configMap:
+                name: {{ .Values.configmap.name }}
+          nodeSelector:
+            kubernetes.io/hostname: {{ index .Values.cronjobs.elkAutoIndex.nodeSelector "kubernetes.io/hostname" }}
+          tolerations:
+            - effect: NoSchedule
+              key: app
+              operator: Equal
+              value: {{ .Values.cronjobs.elkAutoIndex.tolerations.value }}
+          restartPolicy: Never
+  successfulJobsHistoryLimit: {{ .Values.cronjobs.elkAutoIndex.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.cronjobs.elkAutoIndex.failedJobsHistoryLimit }}
