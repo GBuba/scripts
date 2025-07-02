@@ -1,0 +1,4 @@
+apiVersion: v2
+name: keycloak_elastic_rolemappings
+description: A Helm chart for keycloak_elastic_rolemappings, keycloak_groups_roles and elk_auto_index scripts.
+version: 0.1.0
