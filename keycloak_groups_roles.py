@@ -1,27 +1,23 @@
 ### Скрипт создает в реалме NEW_REALM группы из GROUPS_TO_CREATE и кладет в них подгруппы SUBGROUPS + к каждой подгруппе привязывает роль вида {subgroup}-{role_suffix} ###
-### Не забыть изменить "client_secret" ###
 
 import requests
 import json
 import urllib3
+import os
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# Keycloak
-KEYCLOAK_URL = "https://localhost:8080"
-MASTER_REALM = "master"         # Реалм администратора
-ADMIN_USER = "admin"
-ADMIN_PASSWORD = "admin"
+KEYCLOAK_URL = os.getenv("KEYCLOAK_URL")
+MASTER_REALM = os.getenv("MASTER_REALM")
+ADMIN_USER = os.getenv("ADMIN_USER")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
+CLIENT_ID = os.getenv("CLIENT_ID")
+CLIENT_SECRET = os.getenv("CLIENT_SECRET")  
 
-# Новый реалм
-NEW_REALM = "test-realm"
-
-# Группы и подгруппы
-GROUPS_TO_CREATE = ["kibana", "grafana", "k8s"]
-SUBGROUPS = ["test", "prod", "nt", "stage"]
-
-# Префикс ролей (роль будет {subgroup}-{role_suffix})
-ROLE_SUFFIX = "viewer"
+NEW_REALM = os.getenv("NEW_REALM")
+GROUPS_TO_CREATE = os.getenv("GROUPS_TO_CREATE").split()
+SUBGROUPS = os.getenv("SUBGROUPS").split()
+ROLE_SUFFIX = os.getenv("ROLE_SUFFIX") # Префикс ролей (роль будет {subgroup}-{role_suffix})
 
 # Получение токена администратора
 def get_admin_token():
@@ -30,8 +26,8 @@ def get_admin_token():
         "username": ADMIN_USER,
         "password": ADMIN_PASSWORD,
         "grant_type": "password",
-        "client_id": "admin-cli",
-        "client_secret": "your_client_secret_here" # <- Заменить на сектрет от admin-cli
+        "client_id": CLIENT_ID,
+        "client_secret": CLIENT_SECRET
     }
     response = requests.post(token_url, data=data, verify=False)
     response.raise_for_status()
