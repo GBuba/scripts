@@ -1,8 +1,8 @@
-Один скрипт в котором объеденены:
+Один хелм в котором объеденены:
 
-[https://git.moscow.alfaintra.net/projects/ALFAMESSAGING/repos/elk_auto_index/browse](https://github.com/GBuba/scripts/tree/main/elk_auto_index)
-[https://git.moscow.alfaintra.net/projects/ALFAMESSAGING/repos/keycloak_elastic_rolemappings/browse](https://github.com/GBuba/scripts/blob/main/elk_keycloak_rolemappings.py)
-[https://git.moscow.alfaintra.net/projects/ALFAMESSAGING/repos/keycloak_groups_roles/browse](https://github.com/GBuba/scripts/blob/main/keycloak_groups_roles.py)
+https://github.com/GBuba/scripts/tree/main/elk_auto_index
+https://github.com/GBuba/scripts/blob/main/elk_keycloak_rolemappings.py
+[[https://git.moscow.alfaintra.net/projects/ALFAMESSAGING/repos/keycloak_groups_roles/browse](https://github.com/GBuba/scripts/blob/main/keycloak_groups_roles.py)]
 
 
     Как пользоваться:
