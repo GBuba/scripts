@@ -8,7 +8,7 @@ import os
 # Отключаем предупреждения об отключении проверки сертификатов
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# Настройки подключения к es / kibana
+# Настройки подключения к ES / Kibana
 es_host = os.getenv('ES_HOST')  # Хост Elasticsearch из переменной окружения
 kibana_host = os.getenv('KIBANA_HOST')  # Хост Kibana из переменной окружения
 username = os.getenv('USERNAME')  # Имя пользователя из переменной окружения
@@ -35,7 +35,7 @@ if len(common_names) > 0:
         common_name = name.strip()
 
         try:
-            # Проверка, существует ли уже политика ILM
+            # === ПОЛИТИКА ILM ===
             ilm_policy_name = f'{common_name}-policy'
             try:
                 es.ilm.get_lifecycle(name=ilm_policy_name)
@@ -43,7 +43,6 @@ if len(common_names) > 0:
             except NotFoundError:
                 print(f"ILM policy '{ilm_policy_name}' does not exist. Creating...")
 
-                # Определяем политику жизненного цикла индекса
                 lifecycle_policy = {
                     "policy": {
                         "phases": {
@@ -52,7 +51,7 @@ if len(common_names) > 0:
                                 "actions": {
                                     "rollover": {
                                         "max_age": "1d",
-                                        "max_primary_shard_size": "3gb"
+                                        "max_primary_shard_size": "1gb"
                                     },
                                     "set_priority": {
                                         "priority": 100
@@ -60,7 +59,7 @@ if len(common_names) > 0:
                                 }
                             },
                             "delete": {
-                                "min_age": "14d",
+                                "min_age": "30d",
                                 "actions": {
                                     "delete": {
                                         "delete_searchable_snapshot": True
@@ -74,7 +73,7 @@ if len(common_names) > 0:
                 es.ilm.put_lifecycle(name=ilm_policy_name, body=lifecycle_policy)
                 print(f"Index Lifecycle Policy '{ilm_policy_name}' was successfully created.")
 
-            # Создаем или обновляем компонуемый шаблон индекса
+            # === ШАБЛОН ИНДЕКСА ===
             index_template = {
                 "index_patterns": [f"{common_name}-*"],
                 "template": {
@@ -96,7 +95,7 @@ if len(common_names) > 0:
             es.indices.put_index_template(name=f"{common_name}-template", body=index_template)
             print(f"Index template '{common_name}-template' was successfully created.")
 
-            # Создаем индекс с параметром "is_write_index": true
+            # === СОЗДАНИЕ ИНДЕКСА С АЛИАСОМ is_write_index ===
             index_name = f"{common_name}-000001"
             index_body = {
                 "aliases": {
@@ -109,7 +108,7 @@ if len(common_names) > 0:
             es.indices.create(index=index_name, body=index_body)
             print(f"Index '{index_name}' was successfully created with 'is_write_index': true.")
 
-            # Создаем Data View в Kibana
+            # === СОЗДАНИЕ DATA VIEW В KIBANA ===
             data_view_payload = {
                 "attributes": {
                     "name": common_name,
@@ -136,37 +135,61 @@ if len(common_names) > 0:
             else:
                 print(f"Failed to create Data View in Kibana. Status code: {kibana_response.status_code}, Response: {kibana_response.text}")
 
-            # Создаем роль {common_name}-viewer с правами read
-            role_payload = {
-                "cluster": [],
-                "indices": [
-                    {
-                        "names": [f"{common_name}-*"],
-                        "privileges": ["read"]
-                    }
-                ],
-                "applications": [
-                {
-                    "application": "kibana-.kibana",
-                    "privileges": [
-                    "feature_discover.read"
+            # === СОЗДАНИЕ РОЛЕЙ read и admin ===
+            ROLES_CONFIG = {
+                "read": {
+                    "privileges": ["read"],
+                    "kibana_features": [
+                        "feature_discover.read",
+                        "feature_visualize.read",
+                        "feature_dashboard.read"
                     ],
-                    "resources": [
-                    "space:default"
-                    ]
-                }
-                ],
-                "run_as": [],
-                "metadata": {},
-                "transient_metadata": {
-                "enabled": True
+                    "kibana_spaces": ["space:default"]
+                },
+                "admin": {
+                    "privileges": [
+                        "read", "write", "create_index", "delete_index", "manage", "index", "create", "delete"
+                    ],
+                    "kibana_features": [
+                        "feature_discover.all",
+                        "feature_visualize.all",
+                        "feature_dashboard.all",
+                        "feature_maps.all",
+                        "feature_canvas.all"
+                    ],
+                    "kibana_spaces": ["space:default"]  # или ["*"], если нужно в любом space
                 }
             }
 
-            es.security.put_role(name=f"{common_name}-viewer", body=role_payload)
-            print(f"Role '{common_name}-viewer' was successfully created.")
+            for role_type, config in ROLES_CONFIG.items():
+                role_name = f"{common_name}{role_type}"
+                role_payload = {
+                    "cluster": [],
+                    "indices": [
+                        {
+                            "names": [f"{common_name}-*"],
+                            "privileges": config["privileges"]
+                        }
+                    ],
+                    "applications": [
+                        {
+                            "application": "kibana-.kibana",
+                            "privileges": config["kibana_features"],
+                            "resources": ["space:default"]
+                        }
+                    ],
+                    "run_as": [],
+                    "metadata": {},
+                    "transient_metadata": {"enabled": True}
+                }
 
-            # Обновляем роль teamlead-viewer
+                try:
+                    es.security.put_role(name=role_name, body=role_payload)
+                    print(f"Role '{role_name}' was successfully created.")
+                except Exception as e:
+                    print(f"Failed to create role '{role_name}': {e}")
+
+            # === ОБНОВЛЕНИЕ РОЛИ teamlead-viewer (только для read) ===
             try:
                 teamlead_viewer_role = es.security.get_role(name="teamlead-viewer").get("teamlead-viewer", {})
                 indices = teamlead_viewer_role.get("indices", [])
