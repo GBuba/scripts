@@ -71,6 +71,11 @@ spec:
                     secretKeyRef:
                       name: {{ .Values.secret.name }}
                       key: esPassword
+                - name: ROLE_SUFFIX
+                  valueFrom:
+                    configMapKeyRef:
+                      name: {{ .Values.configmap.name }}
+                      key: ROLE_SUFFIX
                 - name: TARGET_GROUP_PATH
                   valueFrom:
                     configMapKeyRef:
