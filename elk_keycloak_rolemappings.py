@@ -3,8 +3,10 @@ import json
 import urllib3
 import os
 
-urllib3.disable_warnings()
+# Отключаем предупреждения о небезопасном SSL (если используется self-signed)
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+# === Загрузка переменных окружения ===
 KEYCLOAK_URL = os.getenv("KEYCLOAK_URL")
 REALM = os.getenv("REALM")
 CLIENT_ID = os.getenv("CLIENT_ID")
@@ -16,84 +18,79 @@ ES_URL = os.getenv("ES_URL")
 ES_USER = os.getenv("ES_USER")
 ES_PASSWORD = os.getenv("ES_PASSWORD")
 
-TARGET_GROUP_PATH = os.getenv("TARGET_GROUP_PATH")
+TARGET_GROUP_PATH = os.getenv("TARGET_GROUP_PATH")  # Например: /kibana
 
-# Получение токена администратора Keycloak
+# Читаем суффиксы из ROLE_SUFFIXE, разбиваем и очищаем от пробелов
+ROLE_SUFFIXES = [suffix.strip() for suffix in os.getenv("ROLE_SUFFIX").split(",")]
+
+
+# === Получение админ-токена Keycloak ===
 def get_kc_admin_token():
     url = f"{KEYCLOAK_URL}/realms/master/protocol/openid-connect/token"
     data = {
-        'client_id': CLIENT_ID,
-        'client_secret': CLIENT_SECRET,
-        'username': ADMIN_USER,
-        'password': ADMIN_PASSWORD,
-        'grant_type': 'password'
+        "client_id": CLIENT_ID,
+        "client_secret": CLIENT_SECRET,
+        "username": ADMIN_USER,
+        "password": ADMIN_PASSWORD,
+        "grant_type": "password",
     }
-
     try:
         response = requests.post(url, data=data, verify=False)
         response.raise_for_status()
-        return response.json()['access_token']
+        return response.json()["access_token"]
     except requests.exceptions.RequestException as e:
-        print("[ERROR] Не удалось получить токен Keycloak:", str(e))
+        print(f"[ERROR] Не удалось получить токен Keycloak: {e}")
         if response.text:
-            print("Ответ сервера:", response.text)
+            print(f"Ответ сервера: {response.text}")
         exit(1)
 
 
-# Получение всех групп из Keycloak
-def get_groups(token, realm=None, parent_id=None):
-    if realm is None:
-        realm = REALM
+# === Рекурсивное получение всех групп ===
+def get_all_groups(token):
+    url = f"{KEYCLOAK_URL}/admin/realms/{REALM}/groups"
+    headers = {"Authorization": f"Bearer {token}"}
 
-    headers = {'Authorization': f'Bearer {token}'}
+    def fetch_children(group_id, headers):
+        try:
+            response = requests.get(
+                f"{url}/{group_id}/children",
+                headers=headers,
+                verify=False
+            )
+            response.raise_for_status()
+            groups = response.json()
+            all_groups = []
+            for group in groups:
+                all_groups.append(group)
+                # Рекурсивно получаем дочерние группы
+                children = fetch_children(group['id'], headers)
+                if children:
+                    all_groups.extend(children)
+            return all_groups
+        except Exception as e:
+            print(f"[ERROR] Ошибка при получении подгрупп: {e}")
+            return []
 
-    if parent_id:
-        url = f"{KEYCLOAK_URL}/admin/realms/{realm}/groups/{parent_id}/children"
-    else:
-        url = f"{KEYCLOAK_URL}/admin/realms/{realm}/groups"
+    # Сначала получаем корневые группы
+    root_groups = requests.get(url, headers=headers, verify=False).json()
 
-    try:
-        response = requests.get(url, headers=headers, verify=False)
-        response.raise_for_status()
-        groups = response.json()
+    # Запускаем рекурсивный сбор всех групп
+    all_groups = []
+    for group in root_groups:
+        all_groups.append(group)
+        children = fetch_children(group['id'], headers)
+        if children:
+            all_groups.extend(children)
 
-        all_groups = []
-        for group in groups:
-            all_groups.append(group)
-            # Рекурсивно получаем подгруппы
-            subgroups = get_groups(token, realm, group['id'])
-            if subgroups:
-                all_groups.extend(subgroups)
-
-        return all_groups
-
-    except requests.exceptions.RequestException as e:
-        print("[ERROR] Ошибка при получении групп:", str(e))
-        if response.text:
-            print("Ответ сервера:", response.text)
-        return []
-
-
-# Рекурсивный обход групп и подгрупп
-def walk_groups(groups):
-    result = []
-    for group in groups:
-        if isinstance(group, dict):
-            path = group.get('path')
-            if path:
-                result.append(path)
-    return result
+    return all_groups
 
 
-# Создание Role Mapping в Elasticsearch
-def create_role_mapping(group_path):
-    group_name = group_path.split("/")[-1]  # получаем 'test' из '/kibana/test'
-    role_name = f"{group_name}-viewer"
-    mapping_name = role_name  # или можно сделать mapping_{group_name}
+# === Создание/обновление role_mapping в Elasticsearch ===
+def create_role_mapping(group_path, role_name):
+    mapping_name = role_name  # имя маппинга = имя роли
+    url = f"{ES_URL}/_security/role_mapping/{mapping_name}"
 
-    es_mapping_url = f"{ES_URL}/_security/role_mapping/{mapping_name}"
-
-    mapping_body = {
+    body = {
         "roles": [role_name],
         "enabled": True,
         "rules": {
@@ -104,45 +101,59 @@ def create_role_mapping(group_path):
         }
     }
 
-    print(f"\n[INFO] Создаю маппинг '{mapping_name}' для группы '{group_path}' → роль '{role_name}'")
-    print(f"URL: {es_mapping_url}")
-    print(f"Тело запроса:\n{json.dumps(mapping_body, indent=2)}")
+    print(f"\n[INFO] Создаю маппинг: '{mapping_name}' для группы '{group_path}'")
+    print(f"Тело запроса:\n{json.dumps(body, indent=2)}")
 
     try:
         response = requests.put(
-            es_mapping_url,
+            url,
             auth=(ES_USER, ES_PASSWORD),
             headers={"Content-Type": "application/json"},
-            data=json.dumps(mapping_body),
-            verify=False
+            json=body,
+            verify=False,
         )
-
-        print(f"[INFO] Статус код: {response.status_code}")
-        print(f"[INFO] Ответ: {response.text}")
+        print(f"[INFO] Статус: {response.status_code}, Ответ: {response.text}")
 
         if response.status_code in (200, 201):
             print(f"[SUCCESS] Маппинг '{mapping_name}' успешно создан.")
         else:
-            print(f"[ERROR] Не удалось создать маппинг '{mapping_name}'.")
+            print(f"[ERROR] Не удалось создать маппинг.")
     except Exception as e:
-        print("[ERROR] Исключение при отправке запроса:", str(e))
+        print(f"[ERROR] Исключение при вызове Elasticsearch: {e}")
 
 
-# Основная функция
+# === Основная логика ===
 def main():
-    token = get_kc_admin_token()
-    groups = get_groups(token)
-    all_group_paths = walk_groups(groups)
+    print("[INFO] Запуск синхронизации маппингов ролей...")
 
-    print("\n[INFO] Все найденные пути групп:")
-    for path in all_group_paths:
+    # Шаг 1: Получаем токен
+    token = get_kc_admin_token()
+
+    # Шаг 2: Получаем все группы
+    groups = get_all_groups(token)
+    group_paths = [g["path"] for g in groups if g.get("path")]
+
+    print(f"[INFO] Найдено {len(group_paths)} групп:")
+    for path in group_paths:
         print(f" - {path}")
 
-    # Фильтруем только те, что начинаются с /kibana/
-    filtered_groups = [path for path in all_group_paths if path.startswith(TARGET_GROUP_PATH)]
+    # Фильтруем по базовому префиксу (например, /kibana)
+    filtered_paths = [p for p in group_paths if p.startswith(TARGET_GROUP_PATH)]
+    print(f"[INFO] После фильтрации по {TARGET_GROUP_PATH}: {len(filtered_paths)}")
 
-    for group_path in filtered_groups:
-        create_role_mapping(group_path)
+    # Ищем группы, заканчивающиеся на нужный суффикс
+    mappings_to_create = []
+    for path in filtered_paths:
+        group_name = path.split("/")[-1]  # например: subgroupAadmin
+        if any(group_name.endswith(suffix) for suffix in ROLE_SUFFIXES):
+            mappings_to_create.append({
+                "path": path,
+                "role": group_name
+            })
+
+    print(f"[INFO] Подходящих групп для маппинга: {len(mappings_to_create)}")
+    for item in mappings_to_create:
+        create_role_mapping(item["path"], item["role"])
 
 
 if __name__ == "__main__":
