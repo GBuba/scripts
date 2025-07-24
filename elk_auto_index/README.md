@@ -4,7 +4,7 @@
     index template,
     index, вида ({common_name}-000001) с параметром "is_write_index": true,
     Discover -> Create a data view {common_name},
-    Создаем роль {common_name}-viewer с правами read,
+    Создаем роль {group}{common_name}read/admin,
     Обновляем роль teamlead-viewer (добавляет права на просмотр нового индекса).
 
 Отрабатывает в 00:00, если нужно срочно:
