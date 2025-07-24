@@ -61,7 +61,7 @@ elasticsearch:
   kibanaHost: "https://moscow.net/kibana" 
   user: elastic
   password: "pa$$w0rd" # Заменить
-  common_name: "testapp1, testapp2" # Указать новое название(если несколько - через запятую)
+  common_name: "test1, test2" # Указать новое название(если несколько - через запятую)
 
 # --- Keycloak ---
 keycloak:
@@ -73,11 +73,11 @@ keycloak:
   clientId: "admin-cli"
   clientSecret: "admin-cli-clientSecret" # Заменить
   groups:
-    - kibana
+    - elk
     - grafana
   subgroups:
-    - testapp1 # тоже самое что и в common_name
-    - testapp2
-  roleSuffix: viewer
+    - test1 # тоже самое что и в common_name
+    - test2
+  roleSuffix: read, admin # Константа
 
-targetGroupPath: "/kibana" # Группа из которой берутся роли
+targetGroupPath: "/elk" # Группа из которой берутся роли в КК
