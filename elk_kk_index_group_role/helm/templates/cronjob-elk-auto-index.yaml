@@ -43,6 +43,10 @@ spec:
                     configMapKeyRef:
                       name: {{ .Values.configmap.name }}
                       key: ES_USER
+                - name: TARGET_GROUP_PATH
+                  valueFrom:
+                    configMapKeyRef:
+                      name: {{ .Values.configmap.name }}
                 - name: ELK_PASSWORD  
                   valueFrom:
                     secretKeyRef:
