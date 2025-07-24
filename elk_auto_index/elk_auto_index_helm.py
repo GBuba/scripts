@@ -14,6 +14,9 @@ kibana_host = os.getenv('KIBANA_HOST')  # Хост Kibana из переменн�
 username = os.getenv('USERNAME')  # Имя пользователя из переменной окружения
 password = os.getenv('ELK_PASSWORD')  # Пароль из переменной окружения
 
+# targetGroupPath из переменной окружения, удаляем / если есть
+target_group_path = os.getenv('TARGET_GROUP_PATH').strip().strip('/')
+
 if password is None:
     print("Password not found in environment variables.")
     exit(1)
@@ -157,12 +160,14 @@ if len(common_names) > 0:
                         "feature_maps.all",
                         "feature_canvas.all"
                     ],
-                    "kibana_spaces": ["space:default"]  # или ["*"], если нужно в любом space
+                    "kibana_spaces": ["space:default"]
                 }
             }
 
             for role_type, config in ROLES_CONFIG.items():
-                role_name = f"{common_name}{role_type}"
+                
+                role_name = f"{target_group_path}{common_name}{role_type}"
+                
                 role_payload = {
                     "cluster": [],
                     "indices": [
