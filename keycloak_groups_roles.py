@@ -8,14 +8,14 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 KEYCLOAK_URL = os.getenv("KEYCLOAK_URL")
 MASTER_REALM = os.getenv("MASTER_REALM")
 ADMIN_USER = os.getenv("ADMIN_USER")
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD") # <-- из Secret
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD") 
 CLIENT_ID = os.getenv("CLIENT_ID")
-CLIENT_SECRET = os.getenv("CLIENT_SECRET")  # <-- из Secret
+CLIENT_SECRET = os.getenv("CLIENT_SECRET")  
 
 NEW_REALM = os.getenv("NEW_REALM")
 GROUPS_TO_CREATE = os.getenv("GROUPS_TO_CREATE").split()
 SUBGROUPS = os.getenv("SUBGROUPS").split()
-ROLE_SUFFIX = os.getenv("ROLE_SUFFIX") # Префикс ролей (роль будет {subgroup}{role_suffix})
+ROLE_SUFFIX = os.getenv("ROLE_SUFFIX") # роль будет {group_name}{subgroup}{suffix}
 
 
 # Получение токена администратора
@@ -170,27 +170,32 @@ def main():
     create_realm(token)
 
     # Парсим ROLE_SUFFIX как список (чтобы можно было передать несколько ролей через запятую)
-    role_suffixes = ROLE_SUFFIX.split(",")
+    role_suffixes = [suffix.strip() for suffix in ROLE_SUFFIX.split(",")]
 
     for group_name in GROUPS_TO_CREATE:
+        # Создаём основную группу
         group_id = create_group(token, NEW_REALM, None, group_name)
         for subgroup in SUBGROUPS:
+            # Создаём подгруппу
             subgroup_id = create_group(token, NEW_REALM, group_id, subgroup, parent_path=group_name)
             for suffix in role_suffixes:
-                suffix = suffix.strip()
-                role_name = f"{subgroup}{suffix}"
-                # Создаём подгруппу с именем роли внутри subgroup
+                # Формируем общее имя с префиксом group_name
+                role_key = f"{group_name}{subgroup}{suffix}"
+
+                # Создаём подгруппу с именем {group_name}{subgroup}{suffix}
                 role_group_id = create_group(
                     token,
                     NEW_REALM,
                     subgroup_id,
-                    role_name,
+                    role_key,
                     parent_path=f"{group_name}/{subgroup}"
                 )
-                # Создание роли
-                create_role(token, NEW_REALM, role_name)
-                # Назначение роли на группу
-                assign_role_to_group(token, NEW_REALM, role_group_id, role_name)
+
+                # Создаём роль с тем же именем
+                create_role(token, NEW_REALM, role_key)
+
+                # Назначаем роль на группу
+                assign_role_to_group(token, NEW_REALM, role_group_id, role_key)
 
 if __name__ == "__main__":
     main()
